@@ -1,0 +1,6 @@
+CREATE TABLE application_health_check
+(
+    id BIGSERIAL PRIMARY KEY,
+    description VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
