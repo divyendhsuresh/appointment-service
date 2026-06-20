@@ -1,7 +1,9 @@
 package com.mykare.appointment_service.Controller;
 
 import com.mykare.appointment_service.Common.Response.ApiResponse;
+import com.mykare.appointment_service.DTO.Request.LoginRequest;
 import com.mykare.appointment_service.DTO.Request.RegisterRequest;
+import com.mykare.appointment_service.DTO.Response.LoginResponse;
 import com.mykare.appointment_service.DTO.Response.RegisterResponse;
 import com.mykare.appointment_service.Service.Interface.AuthService;
 import jakarta.validation.Valid;
@@ -25,5 +27,13 @@ public class AuthController {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(ApiResponse.of(HttpStatus.CREATED.value(), "User registered successfully", response));
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<ApiResponse<LoginResponse>> login(@Valid @RequestBody LoginRequest request) {
+        LoginResponse response = authService.login(request);
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .body(ApiResponse.of(HttpStatus.OK.value(), "Login successful", response));
     }
 }

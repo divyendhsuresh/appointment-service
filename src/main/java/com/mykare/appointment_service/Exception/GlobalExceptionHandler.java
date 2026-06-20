@@ -57,4 +57,22 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.of(HttpStatus.INTERNAL_SERVER_ERROR.value(), "An unexpected error occurred", errorData));
     }
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ResponseEntity<ApiResponse<ErrorResponseData>>
+    handleInvalidCredentials(
+            InvalidCredentialsException exception) {ErrorResponseData errorData = new ErrorResponseData(exception.getMessage(), null);
+        return ResponseEntity
+                .status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.of(HttpStatus.UNAUTHORIZED.value(), exception.getMessage(), errorData));}
+
+    @ExceptionHandler(UserInactiveException.class)
+    public ResponseEntity<ApiResponse<ErrorResponseData>>
+    handleInactiveUser(UserInactiveException exception) {
+        ErrorResponseData errorData = new ErrorResponseData(
+                exception.getMessage(),
+                null);
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.of(HttpStatus.FORBIDDEN.value(), exception.getMessage(), errorData));
+    }
 }
