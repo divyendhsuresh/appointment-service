@@ -22,7 +22,7 @@ public class GlobalExceptionHandler {
                 null);
         return ResponseEntity
                 .status(HttpStatus.CONFLICT)
-                .body(ApiResponse.error("EMAIL_ALREADY_EXISTS", exception.getMessage(), errorData));
+                .body(ApiResponse.of(HttpStatus.CONFLICT.value(), exception.getMessage(), errorData));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -45,7 +45,7 @@ public class GlobalExceptionHandler {
                 validationErrors
         );
 
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error("VALIDATION_ERROR", "Request validation failed", errorData));
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.of(HttpStatus.BAD_REQUEST.value(), "Request validation failed", errorData));
     }
 
     @ExceptionHandler(Exception.class)
@@ -55,6 +55,6 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body(ApiResponse.error("INTERNAL_SERVER_ERROR", "An unexpected error occurred", errorData));
+                .body(ApiResponse.of(HttpStatus.INTERNAL_SERVER_ERROR.value(), "An unexpected error occurred", errorData));
     }
 }

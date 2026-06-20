@@ -7,32 +7,18 @@ public record ApiResponse<T>(
         StatusResponse status,
         T data
 ) {
-    public static <T> ApiResponse<T> success(
-            String code,
+
+    public static <T> ApiResponse<T> of(
+            int code,
             String message,
             T data
     ) {
-        return new ApiResponse<>(
-                new StatusResponse(
-                        code,
-                        message,
-                        OffsetDateTime.now(ZoneOffset.UTC)
-                ),
-                data
+        StatusResponse statusResponse = new StatusResponse(
+                code,
+                message,
+                OffsetDateTime.now(ZoneOffset.UTC)
         );
-    }
-    public static <T> ApiResponse<T> error(
-            String code,
-            String message,
-            T data
-    ) {
-        return new ApiResponse<>(
-                new StatusResponse(
-                        code,
-                        message,
-                        OffsetDateTime.now(ZoneOffset.UTC)
-                ),
-                data
-        );
+
+        return new ApiResponse<>(statusResponse, data);
     }
 }
