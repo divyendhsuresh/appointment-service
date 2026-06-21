@@ -1,6 +1,7 @@
 package com.mykare.appointment_service.Service.Implementation;
 
 import com.mykare.appointment_service.DTO.Request.CreateAppointmentRequest;
+import com.mykare.appointment_service.DTO.Response.CancelAppointmentResponse;
 import com.mykare.appointment_service.DTO.Response.CreateAppointmentResponse;
 import com.mykare.appointment_service.DTO.Response.UserAppointmentResponse;
 import com.mykare.appointment_service.DTO.Response.UserAppointmentsResponse;
@@ -12,8 +13,7 @@ import com.mykare.appointment_service.Enums.AppointmentHistoryAction;
 import com.mykare.appointment_service.Enums.AppointmentStatus;
 import com.mykare.appointment_service.Enums.NotificationStatus;
 import com.mykare.appointment_service.Enums.SlotStatus;
-import com.mykare.appointment_service.Exception.SlotNotFoundException;
-import com.mykare.appointment_service.Exception.SlotUnavailableException;
+import com.mykare.appointment_service.Exception.*;
 import com.mykare.appointment_service.Repository.AppointmentHistoryRepository;
 import com.mykare.appointment_service.Repository.AppointmentRepository;
 import com.mykare.appointment_service.Repository.AppointmentSlotRepository;
@@ -26,7 +26,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.time.ZoneOffset;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -155,6 +157,85 @@ public class AppointmentServiceImpl
                         .toList();
 
         return new UserAppointmentsResponse(appointmentResponses.size(), appointmentResponses);
+    }
+
+    @Override
+    @Transactional
+    public CancelAppointmentResponse cancelAppointment(String userEmail, UUID appointmentId) {
+
+        User user = userRepository
+                .findByEmailIgnoreCase(userEmail)
+                .orElseThrow(() -> new UsernameNotFoundException("Authenticated user not found"));
+
+        Appointment appointment = appointmentRepository
+                .findByIdForUpdate(appointmentId)
+                .orElseThrow(() ->
+                        new AppointmentNotFoundException(
+                                "Appointment not found")
+                );
+
+        if (!appointment.getUser().getId().equals(user.getId())) {
+            throw new AppointmentAccessDeniedException(
+                    "You are not allowed to cancel this appointment"
+            );
+        }
+
+        if (appointment.getStatus() == AppointmentStatus.CANCELLED) {
+            throw new AppointmentCancellationException(
+                    "Appointment is already cancelled"
+            );
+        }
+
+        if (appointment.getStatus() != AppointmentStatus.CONFIRMED) {
+            throw new AppointmentCancellationException(
+                    "Only confirmed appointments can be cancelled"
+            );
+        }
+
+        AppointmentSlot slot = appointment.getSlot();
+
+        AppointmentStatus previousStatus =
+                appointment.getStatus();
+
+        OffsetDateTime cancelledAt =
+                OffsetDateTime.now(ZoneOffset.UTC);
+
+        appointment.setStatus(
+                AppointmentStatus.CANCELLED
+        );
+
+        appointment.setCancelledAt(cancelledAt);
+
+        slot.setStatus(SlotStatus.AVAILABLE);
+
+        appointmentRepository.save(appointment);
+        slotRepository.save(slot);
+
+        AppointmentHistory history =
+                AppointmentHistory.builder()
+                        .appointment(appointment)
+                        .action(
+                                AppointmentHistoryAction.CANCELLED
+                        )
+                        .previousStatus(previousStatus)
+                        .newStatus(
+                                AppointmentStatus.CANCELLED
+                        )
+                        .description(
+                                "Appointment cancelled by user"
+                        )
+                        .changedBy(user.getId())
+                        .build();
+
+        historyRepository.save(history);
+
+        return new CancelAppointmentResponse(
+                appointment.getId(),
+                slot.getId(),
+                appointment.getStatus(),
+                slot.getStatus(),
+                appointment.getCancelledAt()
+        );
     }
 
     private String normalizeReason(String reason) {

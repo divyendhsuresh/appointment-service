@@ -95,7 +95,8 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
                 .status(HttpStatus.NOT_FOUND)
-                .body(ApiResponse.of(HttpStatus.NOT_FOUND.value(), exception.getMessage(), errorData));}
+                .body(ApiResponse.of(HttpStatus.NOT_FOUND.value(), exception.getMessage(), errorData));
+    }
 
     @ExceptionHandler(SlotUnavailableException.class)
     public ResponseEntity<ApiResponse<ErrorResponseData>> handleSlotUnavailableException(SlotUnavailableException exception) {
@@ -103,5 +104,36 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
                 .status(HttpStatus.CONFLICT)
-                .body(ApiResponse.of(HttpStatus.CONFLICT.value(), exception.getMessage(), errorData));}
+                .body(ApiResponse.of(HttpStatus.CONFLICT.value(), exception.getMessage(), errorData));
+    }
+
+    @ExceptionHandler(AppointmentNotFoundException.class)
+    public ResponseEntity<ApiResponse<ErrorResponseData>> handleAppointmentNotFoundException(AppointmentNotFoundException exception) {
+
+        ErrorResponseData errorData = new ErrorResponseData(exception.getMessage(), null);
+
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.of(HttpStatus.NOT_FOUND.value(), exception.getMessage(), errorData));
+    }
+
+    @ExceptionHandler(AppointmentAccessDeniedException.class)
+    public ResponseEntity<ApiResponse<ErrorResponseData>> handleAppointmentAccessDeniedException(AppointmentAccessDeniedException exception) {
+
+        ErrorResponseData errorData = new ErrorResponseData(exception.getMessage(), null);
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.of(HttpStatus.FORBIDDEN.value(), exception.getMessage(), errorData));
+    }
+
+    @ExceptionHandler(AppointmentCancellationException.class)
+    public ResponseEntity<ApiResponse<ErrorResponseData>> handleAppointmentCancellationException(AppointmentCancellationException exception) {
+
+        ErrorResponseData errorData = new ErrorResponseData(exception.getMessage(), null);
+
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(ApiResponse.of(HttpStatus.CONFLICT.value(), exception.getMessage(), errorData));
+    }
 }

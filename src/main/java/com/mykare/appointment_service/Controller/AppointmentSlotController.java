@@ -20,15 +20,9 @@ public class AppointmentSlotController {
 
     @GetMapping("/available")
     public ResponseEntity<ApiResponse<AvailableSlotsResponse>>
-    fetchAvailableSlots(
+    fetchAvailableSlots(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
 
-            @RequestParam
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-            LocalDate date
-    ) {
-
-        AvailableSlotsResponse response =
-                slotService.fetchAvailableSlots(date);
+        AvailableSlotsResponse response = slotService.fetchAvailableSlots(date);
 
         String message;
 
@@ -40,12 +34,6 @@ public class AppointmentSlotController {
 
         return ResponseEntity
                 .status(HttpStatus.OK)
-                .body(
-                        ApiResponse.of(
-                                HttpStatus.OK.value(),
-                                message,
-                                response
-                        )
-                );
+                .body(ApiResponse.of(HttpStatus.OK.value(), message, response));
     }
 }

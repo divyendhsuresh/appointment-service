@@ -38,16 +38,4 @@ public class AuthController {
                 .body(ApiResponse.of(HttpStatus.OK.value(), "Login successful", response));
     }
 
-    @GetMapping("/profile")
-    public ResponseEntity<ApiResponse<String>> profile(
-            Authentication authentication
-    ) {
-        return ResponseEntity.ok(
-                ApiResponse.of(
-                        HttpStatus.OK.value(),
-                        "Token is valid",
-                        authentication.getName()
-                )
-        );
-    }
 }

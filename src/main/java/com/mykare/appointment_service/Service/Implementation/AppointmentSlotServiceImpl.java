@@ -19,8 +19,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-public class AppointmentSlotServiceImpl
-        implements AppointmentSlotService {
+public class AppointmentSlotServiceImpl implements AppointmentSlotService {
 
     private final AppointmentSlotRepository slotRepository;
 
@@ -114,9 +113,7 @@ public class AppointmentSlotServiceImpl
 
     @Override
     @Transactional(readOnly = true)
-    public AvailableSlotsResponse fetchAvailableSlots(
-            LocalDate date
-    ) {
+    public AvailableSlotsResponse fetchAvailableSlots(LocalDate date) {
 
         LocalDate today = LocalDate.now(CLINIC_ZONE);
 
@@ -162,6 +159,7 @@ public class AppointmentSlotServiceImpl
                 slotResponses
         );
     }
+
     @Override
     @Transactional
     public int generateTomorrowSlots() {
