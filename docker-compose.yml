@@ -132,5 +132,12 @@ services:
       APPOINTMENT_SERVICE_URL: http://appointment-service:8080
       INTERNAL_API_KEY: mykare-internal-secret
 
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: 587
+      SMTP_USERNAME: ${SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL}
+      SMTP_USE_TLS: "true"
+
 volumes:
   appointment_postgres_data:
