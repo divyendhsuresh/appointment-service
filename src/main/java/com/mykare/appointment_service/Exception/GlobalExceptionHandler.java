@@ -88,4 +88,20 @@ public class GlobalExceptionHandler {
                         exception.getMessage(),
                         errorData));
     }
+
+    @ExceptionHandler(SlotNotFoundException.class)
+    public ResponseEntity<ApiResponse<ErrorResponseData>> handleSlotNotFoundException(SlotNotFoundException exception) {
+        ErrorResponseData errorData = new ErrorResponseData(exception.getMessage(), null);
+
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.of(HttpStatus.NOT_FOUND.value(), exception.getMessage(), errorData));}
+
+    @ExceptionHandler(SlotUnavailableException.class)
+    public ResponseEntity<ApiResponse<ErrorResponseData>> handleSlotUnavailableException(SlotUnavailableException exception) {
+        ErrorResponseData errorData = new ErrorResponseData(exception.getMessage(), null);
+
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(ApiResponse.of(HttpStatus.CONFLICT.value(), exception.getMessage(), errorData));}
 }
