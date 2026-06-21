@@ -1,14 +1,15 @@
 package com.mykare.appointment_service.Config;
 
+import com.mykare.appointment_service.Filter.TransactionIdFilter;
 import com.mykare.appointment_service.Security.JwtAuthenticationEntryPoint;
 import com.mykare.appointment_service.Security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
-import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
@@ -21,26 +22,24 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final TransactionIdFilter transactionIdFilter;
     private final JwtAuthenticationEntryPoint authenticationEntryPoint;
     private final UserDetailsService userDetailsService;
     private final PasswordEncoder passwordEncoder;
 
     @Bean
-    public SecurityFilterChain securityFilterChain(
-            HttpSecurity http
-    ) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+
         http
                 .cors(cors -> {})
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(
-                                SessionCreationPolicy.STATELESS
-                        ))
+                                SessionCreationPolicy.STATELESS))
 
                 .exceptionHandling(exception ->
                         exception.authenticationEntryPoint(
-                                authenticationEntryPoint
-                        ))
+                                authenticationEntryPoint))
 
                 .authorizeHttpRequests(auth ->
                         auth
@@ -55,10 +54,20 @@ public class SecurityConfig {
                                 .authenticated()
                 )
 
-                .authenticationProvider(authenticationProvider())
+                .authenticationProvider(
+                        authenticationProvider()
+                )
+
+                // Register JWT relative to a built-in Spring Security filter.
                 .addFilterBefore(
                         jwtAuthenticationFilter,
                         UsernamePasswordAuthenticationFilter.class
+                )
+
+                // JWT now has a known order, so transaction filter can go before it.
+                .addFilterBefore(
+                        transactionIdFilter,
+                        JwtAuthenticationFilter.class
                 );
 
         return http.build();
