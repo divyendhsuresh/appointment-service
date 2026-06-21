@@ -14,12 +14,15 @@ import com.mykare.appointment_service.Enums.AppointmentStatus;
 import com.mykare.appointment_service.Enums.NotificationStatus;
 import com.mykare.appointment_service.Enums.SlotStatus;
 import com.mykare.appointment_service.Exception.*;
+import com.mykare.appointment_service.Messaging.Event.AppointmentBookedDomainEvent;
+import com.mykare.appointment_service.Messaging.Event.AppointmentNotificationEvent;
 import com.mykare.appointment_service.Repository.AppointmentHistoryRepository;
 import com.mykare.appointment_service.Repository.AppointmentRepository;
 import com.mykare.appointment_service.Repository.AppointmentSlotRepository;
 import com.mykare.appointment_service.Repository.UserRepository;
 import com.mykare.appointment_service.Service.Interface.AppointmentService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -42,13 +45,11 @@ public class AppointmentServiceImpl
     private final AppointmentSlotRepository slotRepository;
     private final AppointmentHistoryRepository historyRepository;
     private final UserRepository userRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
     @Override
     @Transactional
-    public CreateAppointmentResponse createAppointment(
-            String userEmail,
-            CreateAppointmentRequest request
-    ) {
+    public CreateAppointmentResponse createAppointment(String userEmail, CreateAppointmentRequest request) {
 
         User user = userRepository
                 .findByEmailIgnoreCase(userEmail)
@@ -116,6 +117,27 @@ public class AppointmentServiceImpl
                         .build();
 
         historyRepository.save(history);
+        AppointmentNotificationEvent notificationEvent =
+                new AppointmentNotificationEvent(
+                        UUID.randomUUID(),
+                        appointment.getId(),
+                        user.getId(),
+                        user.getEmail(),
+                        user.getFullName(),
+                        user.getPhone(),
+                        slot.getId(),
+                        slot.getStartTime(),
+                        slot.getEndTime(),
+                        appointment.getReason(),
+                        "APPOINTMENT_BOOKED",
+                        OffsetDateTime.now(ZoneOffset.UTC)
+                );
+
+        eventPublisher.publishEvent(
+                new AppointmentBookedDomainEvent(
+                        notificationEvent
+                )
+        );
 
         return new CreateAppointmentResponse(
                 appointment.getId(),
