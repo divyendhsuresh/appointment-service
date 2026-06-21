@@ -105,6 +105,8 @@ services:
 
       INTERNAL_API_KEY: mykare-internal-secret
 
+      CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:5173
+
     ports:
       - "8080:8080"
 
