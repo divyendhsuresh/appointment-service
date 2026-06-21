@@ -4,6 +4,7 @@ import os
 import signal
 import sys
 import time
+import uuid
 from typing import Any
 
 import requests
@@ -70,6 +71,7 @@ def update_notification_status(
         headers={
             "Content-Type": "application/json",
             "X-Internal-Api-Key": INTERNAL_API_KEY,
+            "X-Transaction-Id":str(uuid.uuid4)
         },
         json={
             "status": status,
