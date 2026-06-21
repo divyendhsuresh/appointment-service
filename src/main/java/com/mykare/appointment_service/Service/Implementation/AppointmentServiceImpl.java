@@ -1,5 +1,6 @@
 package com.mykare.appointment_service.Service.Implementation;
 
+import com.mykare.appointment_service.Common.Constants.HeaderConstants;
 import com.mykare.appointment_service.DTO.Request.CreateAppointmentRequest;
 import com.mykare.appointment_service.DTO.Response.CancelAppointmentResponse;
 import com.mykare.appointment_service.DTO.Response.CreateAppointmentResponse;
@@ -22,6 +23,7 @@ import com.mykare.appointment_service.Repository.AppointmentSlotRepository;
 import com.mykare.appointment_service.Repository.UserRepository;
 import com.mykare.appointment_service.Service.Interface.AppointmentService;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.MDC;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
@@ -117,9 +119,12 @@ public class AppointmentServiceImpl
                         .build();
 
         historyRepository.save(history);
+        String transactionId =
+                MDC.get(HeaderConstants.MDC_TRANSACTION_ID);
         AppointmentNotificationEvent notificationEvent =
                 new AppointmentNotificationEvent(
                         UUID.randomUUID(),
+                        transactionId,
                         appointment.getId(),
                         user.getId(),
                         user.getEmail(),
