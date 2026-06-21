@@ -4,6 +4,7 @@ import com.mykare.appointment_service.Common.Response.ApiResponse;
 import com.mykare.appointment_service.DTO.Request.LoginRequest;
 import com.mykare.appointment_service.DTO.Request.RegisterRequest;
 import com.mykare.appointment_service.DTO.Response.LoginResponse;
+import com.mykare.appointment_service.DTO.Response.LogoutResponse;
 import com.mykare.appointment_service.DTO.Response.RegisterResponse;
 import com.mykare.appointment_service.Service.Interface.AuthService;
 import jakarta.validation.Valid;
@@ -36,6 +37,22 @@ public class AuthController {
         return ResponseEntity
                 .status(HttpStatus.OK)
                 .body(ApiResponse.of(HttpStatus.OK.value(), "Login successful", response));
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<LogoutResponse>> logout(@RequestHeader("Authorization") String authorizationHeader) {
+
+        if (!authorizationHeader.startsWith("Bearer ")) {
+            throw new IllegalArgumentException(
+                    "Invalid Authorization header");
+        }
+
+        String token = authorizationHeader.substring(7);
+
+        LogoutResponse response = authService.logout(token);
+
+        return ResponseEntity.ok(
+                ApiResponse.of(HttpStatus.OK.value(), "Logout successful", response));
     }
 
 }

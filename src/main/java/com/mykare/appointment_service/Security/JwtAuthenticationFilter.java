@@ -1,5 +1,6 @@
 package com.mykare.appointment_service.Security;
 
+import com.mykare.appointment_service.Service.Interface.TokenBlacklistService;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -21,28 +22,33 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final CustomUserDetailsService userDetailsService;
+    private final TokenBlacklistService tokenBlacklistService;
 
     @Override
-    protected void doFilterInternal(
-            HttpServletRequest request,
-            HttpServletResponse response,
-            FilterChain filterChain
-    ) throws ServletException, IOException {
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
 
-        String authorizationHeader =
-                request.getHeader("Authorization");
+        String authorizationHeader = request.getHeader("Authorization");
 
-        if (authorizationHeader == null
-                || !authorizationHeader.startsWith("Bearer ")) {
-
+        if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        String token = authorizationHeader.substring(7);
+        String token =
+                authorizationHeader.substring(7);
 
         try {
-            String email = jwtService.extractEmail(token);
+            String tokenId =
+                    jwtService.extractTokenId(token);
+
+            if (tokenBlacklistService.isBlacklisted(tokenId)) {
+                SecurityContextHolder.clearContext();
+                filterChain.doFilter(request, response);
+                return;
+            }
+
+            String email =
+                    jwtService.extractEmail(token);
 
             if (email != null
                     && SecurityContextHolder
@@ -50,12 +56,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     .getAuthentication() == null) {
 
                 UserDetails userDetails =
-                        userDetailsService.loadUserByUsername(email);
+                        userDetailsService
+                                .loadUserByUsername(email);
 
-                if (jwtService.isTokenValid(
-                        token,
-                        userDetails.getUsername()
-                )) {
+                if (jwtService.isTokenValid(token, userDetails.getUsername())) {
 
                     UsernamePasswordAuthenticationToken authentication =
                             new UsernamePasswordAuthenticationToken(
@@ -75,7 +79,10 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 }
             }
 
-        } catch (JwtException | IllegalArgumentException exception) {
+        } catch (
+                JwtException |
+                IllegalArgumentException exception
+        ) {
             SecurityContextHolder.clearContext();
         }
 

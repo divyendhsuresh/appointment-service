@@ -14,6 +14,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Date;
 import java.util.Map;
+import java.util.UUID;
 import java.util.function.Function;
 
 @Service
@@ -45,6 +46,7 @@ public class JwtService {
         );
 
         return Jwts.builder()
+                .id(UUID.randomUUID().toString())
                 .claims(claims)
                 .subject(user.getEmail())
                 .issuedAt(Date.from(issuedAt))
@@ -60,9 +62,10 @@ public class JwtService {
         return extractClaim(token, Claims::getSubject);
     }
 
-    /**
-     * Extracts the user ID from the custom JWT claim.
-     */
+    public String extractTokenId(String token) {
+        return extractClaim(token, Claims::getId);
+    }
+
     public String extractUserId(String token) {
         return extractClaim(
                 token,
@@ -87,11 +90,10 @@ public class JwtService {
         return extractClaim(token, Claims::getExpiration);
     }
 
-    /**
-     * Validates that the token belongs to the supplied email
-     * and that the token is not expired.
-     */
-    public boolean isTokenValid(String token, String email) {
+    public boolean isTokenValid(
+            String token,
+            String email
+    ) {
 
         String tokenEmail = extractEmail(token);
 
@@ -111,8 +113,9 @@ public class JwtService {
      * Returns the expiry timestamp for the login response.
      */
     public OffsetDateTime calculateExpiryTime() {
-        return OffsetDateTime.now(ZoneOffset.UTC)
-                .plusNanos(jwtExpirationMs * 1_000_000);
+        return Instant.now()
+                .plusMillis(jwtExpirationMs)
+                .atOffset(ZoneOffset.UTC);
     }
 
     /**
@@ -122,7 +125,9 @@ public class JwtService {
             String token,
             Function<Claims, T> claimResolver
     ) {
+
         Claims claims = extractAllClaims(token);
+
         return claimResolver.apply(claims);
     }
 
@@ -148,7 +153,8 @@ public class JwtService {
      */
     private SecretKey getSigningKey() {
 
-        byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
+        byte[] keyBytes =
+                Decoders.BASE64.decode(jwtSecret);
 
         return Keys.hmacShaKeyFor(keyBytes);
     }
