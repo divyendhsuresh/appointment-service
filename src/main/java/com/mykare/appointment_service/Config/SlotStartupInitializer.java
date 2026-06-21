@@ -19,6 +19,6 @@ public class SlotStartupInitializer implements CommandLineRunner {
         int createdSlots = slotService.generateSlotsTwoDaysAhead();
         int tomorrowSlots = slotService.generateTomorrowSlots();
 
-        log.info("Startup slot generation completed. Created {} slots", createdSlots);
+        log.info("Startup slot generation completed. Created {},{} slots", createdSlots,tomorrowSlots);
     }
 }
