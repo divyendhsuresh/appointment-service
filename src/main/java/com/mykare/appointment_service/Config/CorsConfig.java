@@ -47,7 +47,14 @@ public class CorsConfig {
                         "Authorization",
                         "Content-Type",
                         "Accept",
-                        "X-Requested-With"
+                        "X-Requested-With",
+                        "X-Transaction-Id"
+                )
+        );
+        configuration.setExposedHeaders(
+                List.of(
+                        "Authorization",
+                        "X-Transaction-Id"
                 )
         );
 
