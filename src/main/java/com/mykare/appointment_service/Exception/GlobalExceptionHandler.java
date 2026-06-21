@@ -57,4 +57,83 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.of(HttpStatus.INTERNAL_SERVER_ERROR.value(), "An unexpected error occurred", errorData));
     }
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ResponseEntity<ApiResponse<ErrorResponseData>>
+    handleInvalidCredentials(
+            InvalidCredentialsException exception) {ErrorResponseData errorData = new ErrorResponseData(exception.getMessage(), null);
+        return ResponseEntity
+                .status(HttpStatus.UNAUTHORIZED)
+                .body(ApiResponse.of(HttpStatus.UNAUTHORIZED.value(), exception.getMessage(), errorData));}
+
+    @ExceptionHandler(UserInactiveException.class)
+    public ResponseEntity<ApiResponse<ErrorResponseData>>
+    handleInactiveUser(UserInactiveException exception) {
+        ErrorResponseData errorData = new ErrorResponseData(
+                exception.getMessage(),
+                null);
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.of(HttpStatus.FORBIDDEN.value(), exception.getMessage(), errorData));
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiResponse<ErrorResponseData>>
+    handleIllegalArgumentException(IllegalArgumentException exception) {
+        ErrorResponseData errorData = new ErrorResponseData(exception.getMessage(), null);
+
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.of(
+                        HttpStatus.BAD_REQUEST.value(),
+                        exception.getMessage(),
+                        errorData));
+    }
+
+    @ExceptionHandler(SlotNotFoundException.class)
+    public ResponseEntity<ApiResponse<ErrorResponseData>> handleSlotNotFoundException(SlotNotFoundException exception) {
+        ErrorResponseData errorData = new ErrorResponseData(exception.getMessage(), null);
+
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.of(HttpStatus.NOT_FOUND.value(), exception.getMessage(), errorData));
+    }
+
+    @ExceptionHandler(SlotUnavailableException.class)
+    public ResponseEntity<ApiResponse<ErrorResponseData>> handleSlotUnavailableException(SlotUnavailableException exception) {
+        ErrorResponseData errorData = new ErrorResponseData(exception.getMessage(), null);
+
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(ApiResponse.of(HttpStatus.CONFLICT.value(), exception.getMessage(), errorData));
+    }
+
+    @ExceptionHandler(AppointmentNotFoundException.class)
+    public ResponseEntity<ApiResponse<ErrorResponseData>> handleAppointmentNotFoundException(AppointmentNotFoundException exception) {
+
+        ErrorResponseData errorData = new ErrorResponseData(exception.getMessage(), null);
+
+        return ResponseEntity
+                .status(HttpStatus.NOT_FOUND)
+                .body(ApiResponse.of(HttpStatus.NOT_FOUND.value(), exception.getMessage(), errorData));
+    }
+
+    @ExceptionHandler(AppointmentAccessDeniedException.class)
+    public ResponseEntity<ApiResponse<ErrorResponseData>> handleAppointmentAccessDeniedException(AppointmentAccessDeniedException exception) {
+
+        ErrorResponseData errorData = new ErrorResponseData(exception.getMessage(), null);
+
+        return ResponseEntity
+                .status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.of(HttpStatus.FORBIDDEN.value(), exception.getMessage(), errorData));
+    }
+
+    @ExceptionHandler(AppointmentCancellationException.class)
+    public ResponseEntity<ApiResponse<ErrorResponseData>> handleAppointmentCancellationException(AppointmentCancellationException exception) {
+
+        ErrorResponseData errorData = new ErrorResponseData(exception.getMessage(), null);
+
+        return ResponseEntity
+                .status(HttpStatus.CONFLICT)
+                .body(ApiResponse.of(HttpStatus.CONFLICT.value(), exception.getMessage(), errorData));
+    }
 }
