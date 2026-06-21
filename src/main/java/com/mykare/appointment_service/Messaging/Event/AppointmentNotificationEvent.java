@@ -5,6 +5,7 @@ import java.util.UUID;
 
 public record AppointmentNotificationEvent(
         UUID eventId,
+        String transactionId,
         UUID appointmentId,
         UUID userId,
         String email,
