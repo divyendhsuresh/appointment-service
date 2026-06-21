@@ -3,6 +3,7 @@ package com.mykare.appointment_service.Controller;
 import com.mykare.appointment_service.Common.Response.ApiResponse;
 import com.mykare.appointment_service.DTO.Request.CreateAppointmentRequest;
 import com.mykare.appointment_service.DTO.Response.CreateAppointmentResponse;
+import com.mykare.appointment_service.DTO.Response.UserAppointmentsResponse;
 import com.mykare.appointment_service.Service.Interface.AppointmentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -26,5 +27,17 @@ public class AppointmentController {
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(ApiResponse.of(HttpStatus.CREATED.value(), "Appointment booked successfully", response));
+    }
+
+    @GetMapping
+    public ResponseEntity<ApiResponse<UserAppointmentsResponse>> fetchUserAppointments(Authentication authentication) {
+
+        UserAppointmentsResponse response = appointmentService.fetchUserAppointments(authentication.getName());
+
+        String message = response.totalAppointments() == 0
+                ? "No appointments found"
+                : "Appointments fetched successfully";
+
+        return ResponseEntity.ok(ApiResponse.of(HttpStatus.OK.value(), message, response));
     }
 }

@@ -2,6 +2,8 @@ package com.mykare.appointment_service.Service.Implementation;
 
 import com.mykare.appointment_service.DTO.Request.CreateAppointmentRequest;
 import com.mykare.appointment_service.DTO.Response.CreateAppointmentResponse;
+import com.mykare.appointment_service.DTO.Response.UserAppointmentResponse;
+import com.mykare.appointment_service.DTO.Response.UserAppointmentsResponse;
 import com.mykare.appointment_service.Entity.Appointment;
 import com.mykare.appointment_service.Entity.AppointmentHistory;
 import com.mykare.appointment_service.Entity.AppointmentSlot;
@@ -24,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -123,6 +126,35 @@ public class AppointmentServiceImpl
                 appointment.getNotificationStatus(),
                 appointment.getCreatedAt()
         );
+    }
+    @Override
+    @Transactional(readOnly = true)
+    public UserAppointmentsResponse fetchUserAppointments(String userEmail) {
+
+        User user = userRepository
+                .findByEmailIgnoreCase(userEmail)
+                .orElseThrow(() -> new UsernameNotFoundException("Authenticated user not found"));
+
+        List<Appointment> appointments = appointmentRepository.findByUserIdOrderByCreatedAtDesc(user.getId());
+
+        List<UserAppointmentResponse> appointmentResponses =
+                appointments.stream()
+                        .map(appointment ->
+                                new UserAppointmentResponse(
+                                        appointment.getId(),
+                                        appointment.getSlot().getId(),
+                                        appointment.getSlot().getStartTime(),
+                                        appointment.getSlot().getEndTime(),
+                                        appointment.getReason(),
+                                        appointment.getStatus(),
+                                        appointment.getNotificationStatus(),
+                                        appointment.getCancelledAt(),
+                                        appointment.getCreatedAt()
+                                )
+                        )
+                        .toList();
+
+        return new UserAppointmentsResponse(appointmentResponses.size(), appointmentResponses);
     }
 
     private String normalizeReason(String reason) {
