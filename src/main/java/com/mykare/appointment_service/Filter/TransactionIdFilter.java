@@ -63,14 +63,16 @@ public class TransactionIdFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected boolean shouldNotFilter(
-            HttpServletRequest request
-    ) {
-
-        /*
-         * Do not require the header for browser CORS
-         * preflight requests.
-         */
-        return "OPTIONS".equalsIgnoreCase(request.getMethod());
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        boolean corsPreflight =
+                "OPTIONS".equalsIgnoreCase(
+                        request.getMethod()
+                );
+        boolean swaggerRequest =
+                path.startsWith("/swagger-ui")
+                        || path.startsWith("/v3/api-docs")
+                        || path.equals("/swagger-ui.html");
+        return corsPreflight || swaggerRequest;
     }
 }
