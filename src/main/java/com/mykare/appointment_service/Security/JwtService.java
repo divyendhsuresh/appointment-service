@@ -1,6 +1,7 @@
 package com.mykare.appointment_service.Security;
 
 import com.mykare.appointment_service.Entity.User;
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
@@ -13,6 +14,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Date;
 import java.util.Map;
+import java.util.function.Function;
 
 @Service
 public class JwtService {
@@ -28,9 +30,13 @@ public class JwtService {
         this.jwtExpirationMs = jwtExpirationMs;
     }
 
+    /**
+     * Generates a signed JWT token for the authenticated user.
+     */
     public String generateToken(User user) {
-        Instant now = Instant.now();
-        Instant expiry = now.plusMillis(jwtExpirationMs);
+
+        Instant issuedAt = Instant.now();
+        Instant expiresAt = issuedAt.plusMillis(jwtExpirationMs);
 
         Map<String, Object> claims = Map.of(
                 "userId", user.getId().toString(),
@@ -41,19 +47,109 @@ public class JwtService {
         return Jwts.builder()
                 .claims(claims)
                 .subject(user.getEmail())
-                .issuedAt(Date.from(now))
-                .expiration(Date.from(expiry))
+                .issuedAt(Date.from(issuedAt))
+                .expiration(Date.from(expiresAt))
                 .signWith(getSigningKey())
                 .compact();
     }
 
+    /**
+     * Extracts the email stored as the JWT subject.
+     */
+    public String extractEmail(String token) {
+        return extractClaim(token, Claims::getSubject);
+    }
+
+    /**
+     * Extracts the user ID from the custom JWT claim.
+     */
+    public String extractUserId(String token) {
+        return extractClaim(
+                token,
+                claims -> claims.get("userId", String.class)
+        );
+    }
+
+    /**
+     * Extracts the user's role from the JWT.
+     */
+    public String extractRole(String token) {
+        return extractClaim(
+                token,
+                claims -> claims.get("role", String.class)
+        );
+    }
+
+    /**
+     * Extracts the token expiry date.
+     */
+    public Date extractExpiration(String token) {
+        return extractClaim(token, Claims::getExpiration);
+    }
+
+    /**
+     * Validates that the token belongs to the supplied email
+     * and that the token is not expired.
+     */
+    public boolean isTokenValid(String token, String email) {
+
+        String tokenEmail = extractEmail(token);
+
+        return tokenEmail != null
+                && tokenEmail.equalsIgnoreCase(email)
+                && !isTokenExpired(token);
+    }
+
+    /**
+     * Returns true when the JWT expiry date is before now.
+     */
+    public boolean isTokenExpired(String token) {
+        return extractExpiration(token).before(new Date());
+    }
+
+    /**
+     * Returns the expiry timestamp for the login response.
+     */
     public OffsetDateTime calculateExpiryTime() {
         return OffsetDateTime.now(ZoneOffset.UTC)
                 .plusNanos(jwtExpirationMs * 1_000_000);
     }
 
+    /**
+     * Extracts an individual claim using the supplied resolver.
+     */
+    public <T> T extractClaim(
+            String token,
+            Function<Claims, T> claimResolver
+    ) {
+        Claims claims = extractAllClaims(token);
+        return claimResolver.apply(claims);
+    }
+
+    /**
+     * Parses and verifies the JWT signature.
+     *
+     * This method throws a JwtException when:
+     * - the signature is invalid
+     * - the token is expired
+     * - the token format is invalid
+     */
+    private Claims extractAllClaims(String token) {
+
+        return Jwts.parser()
+                .verifyWith(getSigningKey())
+                .build()
+                .parseSignedClaims(token)
+                .getPayload();
+    }
+
+    /**
+     * Creates the HMAC signing key from the Base64 secret.
+     */
     private SecretKey getSigningKey() {
+
         byte[] keyBytes = Decoders.BASE64.decode(jwtSecret);
+
         return Keys.hmacShaKeyFor(keyBytes);
     }
 }

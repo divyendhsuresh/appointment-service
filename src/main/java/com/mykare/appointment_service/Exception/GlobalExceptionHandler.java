@@ -75,4 +75,17 @@ public class GlobalExceptionHandler {
                 .status(HttpStatus.FORBIDDEN)
                 .body(ApiResponse.of(HttpStatus.FORBIDDEN.value(), exception.getMessage(), errorData));
     }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ApiResponse<ErrorResponseData>>
+    handleIllegalArgumentException(IllegalArgumentException exception) {
+        ErrorResponseData errorData = new ErrorResponseData(exception.getMessage(), null);
+
+        return ResponseEntity
+                .status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.of(
+                        HttpStatus.BAD_REQUEST.value(),
+                        exception.getMessage(),
+                        errorData));
+    }
 }
