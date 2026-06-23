@@ -58,23 +58,14 @@ public class AppointmentController {
     )
     @PostMapping
     public ResponseEntity<ApiResponse<CreateAppointmentResponse>> createAppointment(
-            @Valid
-            @RequestBody CreateAppointmentRequest request,
-            Authentication authentication
-    ) {
+            @Valid @RequestBody CreateAppointmentRequest request, Authentication authentication) {
 
         CreateAppointmentResponse response =
                 appointmentService.createAppointment(authentication.getName(), request);
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(
-                        ApiResponse.of(
-                                HttpStatus.CREATED.value(),
-                                "Appointment booked successfully",
-                                response
-                        )
-                );
+                .body(ApiResponse.of(HttpStatus.CREATED.value(), "Appointment booked successfully", response));
     }
 
     @Operation(
@@ -83,8 +74,7 @@ public class AppointmentController {
     )
     @GetMapping
     public ResponseEntity<ApiResponse<UserAppointmentsResponse>> fetchUserAppointments(
-            Authentication authentication
-    ) {
+            Authentication authentication) {
 
         UserAppointmentsResponse response =
                 appointmentService.fetchUserAppointments(
@@ -96,13 +86,7 @@ public class AppointmentController {
                         ? "No appointments found"
                         : "Appointments fetched successfully";
 
-        return ResponseEntity.ok(
-                ApiResponse.of(
-                        HttpStatus.OK.value(),
-                        message,
-                        response
-                )
-        );
+        return ResponseEntity.ok(ApiResponse.of(HttpStatus.OK.value(), message, response));
     }
 
     @Operation(
@@ -137,12 +121,6 @@ public class AppointmentController {
         CancelAppointmentResponse response =
                 appointmentService.cancelAppointment(authentication.getName(), appointmentId);
 
-        return ResponseEntity.ok(
-                ApiResponse.of(
-                        HttpStatus.OK.value(),
-                        "Appointment cancelled successfully",
-                        response
-                )
-        );
+        return ResponseEntity.ok(ApiResponse.of(HttpStatus.OK.value(), "Appointment cancelled successfully", response));
     }
 }
