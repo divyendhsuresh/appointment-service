@@ -48,7 +48,9 @@ public class AuthController {
         LoginResponse response =
                 authService.login(request);
 
-        return ResponseEntity.ok(ApiResponse.of(HttpStatus.OK.value(), "Login successful", response));
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .body(ApiResponse.of(HttpStatus.OK.value(), "Login successful", response));
     }
 
     @Operation(
