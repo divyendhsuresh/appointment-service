@@ -13,12 +13,8 @@ public class AppointmentSlotScheduler {
 
     private final AppointmentSlotService slotService;
 
-    @Scheduled(
-            cron = "0 5 0 * * *",
-            zone = "Asia/Kolkata"
-    )
-    public void generateUpcomingSlots() {
-
+    @Scheduled(cron = "0 5 0 * * *", zone = "Asia/Kolkata") public void generateUpcomingSlots() {
+        
         int tomorrowSlots =
                 slotService.generateTomorrowSlots();
 

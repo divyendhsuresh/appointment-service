@@ -44,17 +44,4 @@ public class TokenBlacklistServiceImpl
         return true;
     }
 
-    @Override
-    @Scheduled(fixedRate = 600000)
-    public void removeExpiredTokens() {
-
-        Instant now = Instant.now();
-
-        blacklistedTokens.entrySet()
-                .removeIf(entry ->
-                        entry.getValue()
-                                .toInstant()
-                                .isBefore(now)
-                );
-    }
 }

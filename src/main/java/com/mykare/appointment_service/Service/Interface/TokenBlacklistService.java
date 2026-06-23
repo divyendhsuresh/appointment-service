@@ -8,5 +8,4 @@ public interface TokenBlacklistService {
 
     boolean isBlacklisted(String tokenId);
 
-    void removeExpiredTokens();
 }
