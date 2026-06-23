@@ -24,10 +24,7 @@ public class NotificationStatusServiceImpl
 
     @Override
     @Transactional
-    public NotificationStatusResponse updateStatus(
-            UUID appointmentId,
-            NotificationStatus status
-    ) {
+    public NotificationStatusResponse updateStatus(UUID appointmentId, NotificationStatus status) {
 
         Appointment appointment = appointmentRepository
                 .findById(appointmentId)
