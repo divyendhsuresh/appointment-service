@@ -22,9 +22,7 @@ public class AppointmentNotificationProducer {
     @Value("${app.kafka.topics.appointment-notifications}")
     private String notificationTopic;
 
-    public void send(
-            AppointmentNotificationEvent event
-    ) {
+    public void send(AppointmentNotificationEvent event) {
 
         final String payload;
 

@@ -16,6 +16,7 @@ import com.mykare.appointment_service.Security.JwtService;
 import com.mykare.appointment_service.Service.Interface.AuthService;
 import com.mykare.appointment_service.Service.Interface.TokenBlacklistService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -24,7 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Date;
-
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
@@ -51,9 +52,7 @@ public class AuthServiceImpl implements AuthService {
         User user = User.builder()
                 .fullName(request.fullName().trim())
                 .email(normalizedEmail)
-                .passwordHash(
-                        passwordEncoder.encode(request.password())
-                )
+                .passwordHash(passwordEncoder.encode(request.password()))
                 .phone(normalizePhone(request.phone()))
                 .role(UserRole.USER)
                 .active(true)
