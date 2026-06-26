@@ -1,77 +1,97 @@
 package com.mykare.appointment_service.Messaging.Producer;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mykare.appointment_service.Messaging.Event.AppointmentNotificationEvent;
-import com.mykare.appointment_service.Service.Interface.NotificationStatusService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.kafka.clients.producer.ProducerRecord;
+import org.apache.kafka.common.header.Headers;
+import org.apache.kafka.common.header.internals.RecordHeader;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
+import java.nio.charset.StandardCharsets;
+
+@Slf4j
 @Component
 @RequiredArgsConstructor
-@Slf4j
 public class AppointmentNotificationProducer {
 
-    private final KafkaTemplate<String, String> kafkaTemplate;
-    private final ObjectMapper objectMapper;
-    private final NotificationStatusService notificationStatusService;
+    private static final String TRANSACTION_ID_HEADER =
+            "X-Transaction-Id";
+
+    private static final String EVENT_TYPE_HEADER =
+            "eventType";
+
+    private final KafkaTemplate<String, AppointmentNotificationEvent>
+            kafkaTemplate;
 
     @Value("${app.kafka.topics.appointment-notifications}")
     private String notificationTopic;
 
     public void send(AppointmentNotificationEvent event) {
 
-        final String payload;
+        String messageKey = event.appointmentId().toString();
 
-        try {
-            payload = objectMapper.writeValueAsString(event);
-        } catch (JsonProcessingException exception) {
+        Headers headers = new org.apache.kafka.common.header.internals.RecordHeaders();
 
-            log.error(
-                    "Failed to serialize notification event. Appointment ID: {}",
-                    event.appointmentId(),
-                    exception
-            );
-
-            notificationStatusService.markFailed(
-                    event.appointmentId()
-            );
-
-            return;
-        }
-
-        kafkaTemplate
-                .send(
-                        notificationTopic,
-                        event.appointmentId().toString(),
-                        payload
+        headers.add(
+                new RecordHeader(
+                        TRANSACTION_ID_HEADER,
+                        event.transactionId().getBytes(StandardCharsets.UTF_8)
                 )
+        );
+
+        headers.add(
+                new RecordHeader(
+                        EVENT_TYPE_HEADER,
+                        event.eventType().getBytes(StandardCharsets.UTF_8)
+                )
+        );
+
+        ProducerRecord<String, AppointmentNotificationEvent> record =
+                new ProducerRecord<>(
+                        notificationTopic,
+                        null,
+                        messageKey,
+                        event,
+                        headers
+                );
+
+        log.info(
+                "Publishing Kafka event. topic={}, key={}, appointmentId={}, transactionId={}",
+                notificationTopic,
+                messageKey,
+                event.appointmentId(),
+                event.transactionId()
+        );
+
+        kafkaTemplate.send(record)
                 .whenComplete((result, exception) -> {
 
                     if (exception != null) {
-
                         log.error(
-                                "Failed to publish Kafka notification event. Appointment ID: {}",
+                                "Kafka publishing failed. topic={}, key={}, appointmentId={}, transactionId={}",
+                                notificationTopic,
+                                messageKey,
                                 event.appointmentId(),
+                                event.transactionId(),
                                 exception
-                        );
-
-                        notificationStatusService.markFailed(
-                                event.appointmentId()
                         );
 
                         return;
                     }
 
+                    var metadata = result.getRecordMetadata();
+
                     log.info(
-                            "Kafka event published. Appointment ID: {}, topic: {}, partition: {}, offset: {}",
+                            "Kafka event published successfully. topic={}, partition={}, offset={}, timestamp={}, appointmentId={}, transactionId={}",
+                            metadata.topic(),
+                            metadata.partition(),
+                            metadata.offset(),
+                            metadata.timestamp(),
                             event.appointmentId(),
-                            result.getRecordMetadata().topic(),
-                            result.getRecordMetadata().partition(),
-                            result.getRecordMetadata().offset()
+                            event.transactionId()
                     );
                 });
     }

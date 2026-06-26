@@ -26,6 +26,7 @@ services:
       retries: 5
       start_period: 10s
 
+
   kafka:
     image: apache/kafka:4.1.2
     container_name: appointment-kafka
@@ -65,6 +66,9 @@ services:
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
       KAFKA_NUM_PARTITIONS: 3
 
+    volumes:
+      - appointment_kafka_data:/var/lib/kafka/data
+
     healthcheck:
       test:
         [
@@ -75,6 +79,13 @@ services:
       timeout: 10s
       retries: 10
       start_period: 20s
+
+    logging:
+      driver: local
+      options:
+        max-size: "20m"
+        max-file: "5"
+
 
   appointment-service:
     build:
@@ -87,6 +98,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+
       kafka:
         condition: service_healthy
 
@@ -97,18 +109,30 @@ services:
 
       SERVER_PORT: 8080
 
-      JWT_SECRET: TXlLYXJlQXBwb2ludG1lbnRTZXJ2aWNlU2VjdXJlSldUU2VjcmV0S2V5MjAyNg==
+      JWT_SECRET: ${JWT_SECRET}
       JWT_EXPIRATION_MS: 3600000
 
       KAFKA_BOOTSTRAP_SERVERS: kafka:29092
       APPOINTMENT_NOTIFICATION_TOPIC: appointment-notifications
 
-      INTERNAL_API_KEY: mykare-internal-secret
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
 
       CORS_ALLOWED_ORIGINS: http://localhost:5173
 
+      LOG_PATH: /app/logs
+
     ports:
       - "8080:8080"
+
+    volumes:
+      - ./logs/booking-service:/app/logs
+
+    logging:
+      driver: local
+      options:
+        max-size: "20m"
+        max-file: "5"
+
 
   notification-worker:
     build:
@@ -121,6 +145,7 @@ services:
     depends_on:
       kafka:
         condition: service_healthy
+
       appointment-service:
         condition: service_started
 
@@ -130,7 +155,7 @@ services:
       KAFKA_GROUP_ID: appointment-notification-workers
 
       APPOINTMENT_SERVICE_URL: http://appointment-service:8080
-      INTERNAL_API_KEY: mykare-internal-secret
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY}
 
       SMTP_HOST: smtp.gmail.com
       SMTP_PORT: 587
@@ -139,5 +164,20 @@ services:
       SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL}
       SMTP_USE_TLS: "true"
 
+      LOG_PATH: /app/logs
+      LOG_LEVEL: INFO
+      LOG_FILE_NAME: notification-worker.log
+
+    volumes:
+      - ./logs/notification-worker:/app/logs
+
+    logging:
+      driver: local
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+
 volumes:
   appointment_postgres_data:
+  appointment_kafka_data:

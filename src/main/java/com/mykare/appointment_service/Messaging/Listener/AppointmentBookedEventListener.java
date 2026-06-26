@@ -8,9 +8,9 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
-@Slf4j
 public class AppointmentBookedEventListener {
 
     private final AppointmentNotificationProducer notificationProducer;
@@ -22,13 +22,14 @@ public class AppointmentBookedEventListener {
             AppointmentBookedDomainEvent domainEvent
     ) {
 
+        var event = domainEvent.notificationEvent();
+
         log.info(
-                "Appointment transaction committed. Publishing notification event for appointment {}",
-                domainEvent.notificationEvent().appointmentId()
+                "Database transaction committed. Publishing notification event. appointmentId={}, transactionId={}",
+                event.appointmentId(),
+                event.transactionId()
         );
 
-        notificationProducer.send(
-                domainEvent.notificationEvent()
-        );
+        notificationProducer.send(event);
     }
 }

@@ -7,6 +7,7 @@ import sys
 import time
 import uuid
 from email.message import EmailMessage
+from logging.handlers import TimedRotatingFileHandler
 from typing import Any
 
 import requests
@@ -22,33 +23,153 @@ from confluent_kafka import (
 # Logging configuration
 # =========================================================
 
-logging.basicConfig(
-    level=logging.INFO,
-    format=(
-        "%(asctime)s "
-        "%(levelname)s "
-        "[transactionId=%(transaction_id)s] "
-        "%(message)s"
-    ),
+LOG_PATH = os.getenv(
+    "LOG_PATH",
+    "./logs/notification-worker",
+)
+
+LOG_LEVEL_NAME = os.getenv(
+    "LOG_LEVEL",
+    "INFO",
+).upper()
+
+LOG_LEVEL = getattr(
+    logging,
+    LOG_LEVEL_NAME,
+    logging.INFO,
+)
+
+LOG_FILE_NAME = os.getenv(
+    "LOG_FILE_NAME",
+    "notification-worker.log",
 )
 
 
-class TransactionIdFilter(logging.Filter):
+class LoggingContextFilter(logging.Filter):
+    """
+    Ensures custom logging attributes always exist.
 
-    def filter(self, record: logging.LogRecord) -> bool:
+    Without this filter, Python logging raises an error when a log
+    statement does not contain transaction_id or appointment_id.
+    """
+
+    def filter(
+        self,
+        record: logging.LogRecord,
+    ) -> bool:
+
         if not hasattr(record, "transaction_id"):
             record.transaction_id = "N/A"
+
+        if not hasattr(record, "appointment_id"):
+            record.appointment_id = "N/A"
 
         return True
 
 
-LOGGER = logging.getLogger("notification-worker")
-LOGGER.addFilter(TransactionIdFilter())
+def configure_logging() -> logging.Logger:
+    os.makedirs(
+        LOG_PATH,
+        exist_ok=True,
+    )
+
+    log_file_path = os.path.join(
+        LOG_PATH,
+        LOG_FILE_NAME,
+    )
+
+    formatter = logging.Formatter(
+        fmt=(
+            "%(asctime)s "
+            "%(levelname)-8s "
+            "service=notification-worker "
+            "thread=%(threadName)s "
+            "transactionId=%(transaction_id)s "
+            "appointmentId=%(appointment_id)s "
+            "logger=%(name)s - "
+            "%(message)s"
+        ),
+        datefmt="%Y-%m-%dT%H:%M:%S%z",
+    )
+
+    context_filter = LoggingContextFilter()
+
+    console_handler = logging.StreamHandler(
+        sys.stdout
+    )
+
+    console_handler.setLevel(
+        LOG_LEVEL
+    )
+
+    console_handler.setFormatter(
+        formatter
+    )
+
+    console_handler.addFilter(
+        context_filter
+    )
+
+    file_handler = TimedRotatingFileHandler(
+        filename=log_file_path,
+        when="midnight",
+        interval=1,
+        backupCount=30,
+        encoding="utf-8",
+        utc=True,
+    )
+
+    file_handler.setLevel(
+        LOG_LEVEL
+    )
+
+    file_handler.setFormatter(
+        formatter
+    )
+
+    file_handler.addFilter(
+        context_filter
+    )
+
+    root_logger = logging.getLogger()
+    root_logger.setLevel(LOG_LEVEL)
+
+    # Avoid duplicate handlers when the module is reloaded.
+    root_logger.handlers.clear()
+
+    root_logger.addHandler(
+        console_handler
+    )
+
+    root_logger.addHandler(
+        file_handler
+    )
+
+    # Reduce third-party library noise.
+    logging.getLogger(
+        "urllib3"
+    ).setLevel(logging.WARNING)
+
+    logging.getLogger(
+        "requests"
+    ).setLevel(logging.WARNING)
+
+    return logging.getLogger(
+        "notification-worker"
+    )
 
 
-def log_extra(transaction_id: str) -> dict[str, str]:
+LOGGER = configure_logging()
+
+
+def log_extra(
+    transaction_id: str = "N/A",
+    appointment_id: str = "N/A",
+) -> dict[str, str]:
+
     return {
-        "transaction_id": transaction_id,
+        "transaction_id": transaction_id or "N/A",
+        "appointment_id": appointment_id or "N/A",
     }
 
 
@@ -79,7 +200,7 @@ KAFKA_GROUP_ID = os.getenv(
 APPOINTMENT_SERVICE_URL = os.getenv(
     "APPOINTMENT_SERVICE_URL",
     "http://localhost:8080",
-)
+).rstrip("/")
 
 INTERNAL_API_KEY = os.getenv(
     "INTERNAL_API_KEY",
@@ -134,19 +255,109 @@ def handle_shutdown(
     frame: Any,
 ) -> None:
 
+    del frame
+
     global running
 
     LOGGER.info(
-        "Shutdown signal received: %s",
+        "Shutdown signal received. signal=%s",
         signum,
-        extra=log_extra("N/A"),
+        extra=log_extra(),
     )
 
     running = False
 
 
-signal.signal(signal.SIGINT, handle_shutdown)
-signal.signal(signal.SIGTERM, handle_shutdown)
+signal.signal(
+    signal.SIGINT,
+    handle_shutdown,
+)
+
+signal.signal(
+    signal.SIGTERM,
+    handle_shutdown,
+)
+
+
+# =========================================================
+# Utility methods
+# =========================================================
+
+def mask_email(
+    email: str | None,
+) -> str:
+
+    if not email:
+        return "N/A"
+
+    if "@" not in email:
+        return "***"
+
+    local_part, domain = email.split(
+        "@",
+        maxsplit=1,
+    )
+
+    if len(local_part) <= 1:
+        masked_local = "*"
+
+    elif len(local_part) == 2:
+        masked_local = (
+            local_part[0]
+            + "*"
+        )
+
+    else:
+        masked_local = (
+            local_part[0]
+            + ("*" * (len(local_part) - 2))
+            + local_part[-1]
+        )
+
+    return f"{masked_local}@{domain}"
+
+
+def decode_message_key(
+    message: Message,
+) -> str:
+
+    key = message.key()
+
+    if key is None:
+        return "N/A"
+
+    if isinstance(key, bytes):
+        return key.decode(
+            "utf-8",
+            errors="replace",
+        )
+
+    return str(key)
+
+
+def get_transaction_id_from_headers(
+    message: Message,
+) -> str | None:
+
+    headers = message.headers() or []
+
+    for header_name, header_value in headers:
+
+        if header_name.lower() != "x-transaction-id":
+            continue
+
+        if header_value is None:
+            return None
+
+        if isinstance(header_value, bytes):
+            return header_value.decode(
+                "utf-8",
+                errors="replace",
+            )
+
+        return str(header_value)
+
+    return None
 
 
 # =========================================================
@@ -165,8 +376,19 @@ def update_notification_status(
         f"{appointment_id}/notification-status"
     )
 
+    context = log_extra(
+        transaction_id,
+        appointment_id,
+    )
+
+    LOGGER.info(
+        "Updating notification status. status=%s",
+        status,
+        extra=context,
+    )
+
     response = requests.patch(
-        url,
+        url=url,
         headers={
             "Content-Type": "application/json",
             "X-Internal-Api-Key": INTERNAL_API_KEY,
@@ -178,14 +400,28 @@ def update_notification_status(
         timeout=10,
     )
 
-    response.raise_for_status()
+    try:
+        response.raise_for_status()
+
+    except requests.HTTPError:
+
+        LOGGER.error(
+            "Notification status update failed. "
+            "status=%s httpStatus=%s response=%s",
+            status,
+            response.status_code,
+            response.text[:500],
+            extra=context,
+        )
+
+        raise
 
     LOGGER.info(
-        "Notification status updated: "
-        "appointment=%s status=%s",
-        appointment_id,
+        "Notification status updated successfully. "
+        "status=%s httpStatus=%s",
         status,
-        extra=log_extra(transaction_id),
+        response.status_code,
+        extra=context,
     )
 
 
@@ -195,19 +431,27 @@ def update_notification_status(
 
 def validate_smtp_configuration() -> None:
 
+    missing_values: list[str] = []
+
     if not SMTP_USERNAME:
-        raise ValueError(
-            "SMTP_USERNAME is not configured"
+        missing_values.append(
+            "SMTP_USERNAME"
         )
 
     if not SMTP_PASSWORD:
-        raise ValueError(
-            "SMTP_PASSWORD is not configured"
+        missing_values.append(
+            "SMTP_PASSWORD"
         )
 
     if not SMTP_FROM_EMAIL:
+        missing_values.append(
+            "SMTP_FROM_EMAIL"
+        )
+
+    if missing_values:
         raise ValueError(
-            "SMTP_FROM_EMAIL is not configured"
+            "Missing SMTP configuration: "
+            + ", ".join(missing_values)
         )
 
 
@@ -229,7 +473,10 @@ def create_email_message(
 
     message = EmailMessage()
 
-    message["Subject"] = "Appointment Booking Confirmation"
+    message["Subject"] = (
+        "Appointment Booking Confirmation"
+    )
+
     message["From"] = SMTP_FROM_EMAIL
     message["To"] = recipient_email
 
@@ -263,14 +510,30 @@ def send_notification(
 
     validate_smtp_configuration()
 
-    recipient_email = event.get("email")
+    appointment_id = str(
+        event.get(
+            "appointmentId",
+            "N/A",
+        )
+    )
 
-    message = create_email_message(event)
+    recipient_email = event.get(
+        "email"
+    )
+
+    context = log_extra(
+        transaction_id,
+        appointment_id,
+    )
+
+    message = create_email_message(
+        event
+    )
 
     LOGGER.info(
-        "Sending appointment confirmation email to %s",
-        recipient_email,
-        extra=log_extra(transaction_id),
+        "Sending appointment confirmation email. recipient=%s",
+        mask_email(recipient_email),
+        extra=context,
     )
 
     with smtplib.SMTP(
@@ -290,14 +553,14 @@ def send_notification(
             SMTP_PASSWORD,
         )
 
-        smtp.send_message(message)
+        smtp.send_message(
+            message
+        )
 
     LOGGER.info(
-        "Appointment confirmation email sent successfully "
-        "to %s for appointment %s",
-        recipient_email,
-        event.get("appointmentId"),
-        extra=log_extra(transaction_id),
+        "Appointment confirmation email sent successfully. recipient=%s",
+        mask_email(recipient_email),
+        extra=context,
     )
 
 
@@ -316,9 +579,14 @@ def parse_event(
             "Kafka message does not contain a value"
         )
 
+    if isinstance(raw_value, bytes):
+        raw_value = raw_value.decode(
+            "utf-8",
+        )
+
     try:
-        return json.loads(
-            raw_value.decode("utf-8")
+        parsed_value = json.loads(
+            raw_value
         )
 
     except json.JSONDecodeError as exception:
@@ -326,23 +594,58 @@ def parse_event(
             "Kafka message contains invalid JSON"
         ) from exception
 
+    if not isinstance(
+        parsed_value,
+        dict,
+    ):
+        raise ValueError(
+            "Kafka message must contain a JSON object"
+        )
+
+    return parsed_value
+
 
 def resolve_transaction_id(
     event: dict[str, Any],
+    message: Message,
 ) -> str:
 
-    transaction_id = event.get("transactionId")
+    transaction_id = event.get(
+        "transactionId"
+    )
 
     if transaction_id:
-        return transaction_id
+        return str(
+            transaction_id
+        )
 
-    fallback_transaction_id = str(uuid.uuid4())
+    header_transaction_id = (
+        get_transaction_id_from_headers(
+            message
+        )
+    )
+
+    if header_transaction_id:
+        LOGGER.warning(
+            "Kafka event body does not contain transactionId. "
+            "Using transaction ID from Kafka header.",
+            extra=log_extra(
+                header_transaction_id
+            ),
+        )
+
+        return header_transaction_id
+
+    fallback_transaction_id = str(
+        uuid.uuid4()
+    )
 
     LOGGER.warning(
         "Kafka event does not contain transactionId. "
-        "Generated fallback transaction ID: %s",
-        fallback_transaction_id,
-        extra=log_extra(fallback_transaction_id),
+        "Generated fallback transaction ID.",
+        extra=log_extra(
+            fallback_transaction_id
+        ),
     )
 
     return fallback_transaction_id
@@ -352,24 +655,44 @@ def process_message(
     message: Message,
 ) -> None:
 
-    event = parse_event(message)
+    event = parse_event(
+        message
+    )
 
-    appointment_id = event.get("appointmentId")
+    appointment_id_value = event.get(
+        "appointmentId"
+    )
 
-    if not appointment_id:
+    if not appointment_id_value:
         raise ValueError(
             "Kafka event does not contain appointmentId"
         )
 
-    transaction_id = resolve_transaction_id(event)
+    appointment_id = str(
+        appointment_id_value
+    )
+
+    transaction_id = resolve_transaction_id(
+        event,
+        message,
+    )
+
+    context = log_extra(
+        transaction_id,
+        appointment_id,
+    )
 
     LOGGER.info(
-        "Processing notification event: "
-        "appointmentId=%s eventId=%s eventType=%s",
-        appointment_id,
+        "Processing notification event. "
+        "eventId=%s eventType=%s topic=%s "
+        "partition=%s offset=%s key=%s",
         event.get("eventId"),
         event.get("eventType"),
-        extra=log_extra(transaction_id),
+        message.topic(),
+        message.partition(),
+        message.offset(),
+        decode_message_key(message),
+        extra=context,
     )
 
     try:
@@ -390,11 +713,16 @@ def process_message(
             transaction_id=transaction_id,
         )
 
+        LOGGER.info(
+            "Notification event processed successfully.",
+            extra=context,
+        )
+
     except Exception:
+
         LOGGER.exception(
-            "Notification processing failed for appointment %s",
-            appointment_id,
-            extra=log_extra(transaction_id),
+            "Notification processing failed.",
+            extra=context,
         )
 
         try:
@@ -405,11 +733,10 @@ def process_message(
             )
 
         except Exception:
+
             LOGGER.exception(
-                "Failed to update notification status "
-                "to FAILED for appointment %s",
-                appointment_id,
-                extra=log_extra(transaction_id),
+                "Failed to update notification status to FAILED.",
+                extra=context,
             )
 
         raise
@@ -444,34 +771,56 @@ def create_consumer() -> Consumer:
     )
 
 
-def extract_transaction_id_for_logging(
+def extract_logging_context(
     message: Message,
-) -> str:
+) -> tuple[str, str]:
 
     try:
-        event = parse_event(message)
+        event = parse_event(
+            message
+        )
 
-        return event.get("transactionId") or "N/A"
+        appointment_id = str(
+            event.get(
+                "appointmentId",
+                "N/A",
+            )
+        )
+
+        transaction_id = (
+            event.get("transactionId")
+            or get_transaction_id_from_headers(message)
+            or "N/A"
+        )
+
+        return (
+            str(transaction_id),
+            appointment_id,
+        )
 
     except Exception:
-        return "N/A"
+        return (
+            "N/A",
+            "N/A",
+        )
 
 
 def main() -> None:
 
     consumer = create_consumer()
 
-    consumer.subscribe(
-        [KAFKA_TOPIC]
-    )
-
     LOGGER.info(
-        "Notification worker started. "
-        "Topic=%s group=%s bootstrapServers=%s",
+        "Starting notification worker. "
+        "topic=%s group=%s bootstrapServers=%s logPath=%s",
         KAFKA_TOPIC,
         KAFKA_GROUP_ID,
         KAFKA_BOOTSTRAP_SERVERS,
-        extra=log_extra("N/A"),
+        LOG_PATH,
+        extra=log_extra(),
+    )
+
+    consumer.subscribe(
+        [KAFKA_TOPIC]
     )
 
     try:
@@ -490,18 +839,54 @@ def main() -> None:
                     message.error().code()
                     == KafkaError._PARTITION_EOF
                 ):
+
+                    LOGGER.debug(
+                        "Reached Kafka partition end. "
+                        "topic=%s partition=%s offset=%s",
+                        message.topic(),
+                        message.partition(),
+                        message.offset(),
+                        extra=log_extra(),
+                    )
+
                     continue
+
+                LOGGER.error(
+                    "Kafka consumer error. code=%s error=%s",
+                    message.error().code(),
+                    message.error(),
+                    extra=log_extra(),
+                )
 
                 raise KafkaException(
                     message.error()
                 )
 
-            transaction_id = (
-                extract_transaction_id_for_logging(message)
+            transaction_id, appointment_id = (
+                extract_logging_context(
+                    message
+                )
+            )
+
+            context = log_extra(
+                transaction_id,
+                appointment_id,
+            )
+
+            LOGGER.info(
+                "Kafka message received. "
+                "topic=%s partition=%s offset=%s key=%s",
+                message.topic(),
+                message.partition(),
+                message.offset(),
+                decode_message_key(message),
+                extra=context,
             )
 
             try:
-                process_message(message)
+                process_message(
+                    message
+                )
 
                 consumer.commit(
                     message=message,
@@ -509,31 +894,43 @@ def main() -> None:
                 )
 
                 LOGGER.info(
-                    "Kafka message committed. "
+                    "Kafka message committed successfully. "
                     "topic=%s partition=%s offset=%s",
                     message.topic(),
                     message.partition(),
                     message.offset(),
-                    extra=log_extra(transaction_id),
+                    extra=context,
                 )
 
             except Exception:
+
                 LOGGER.exception(
                     "Kafka message was not committed because "
-                    "notification processing failed",
-                    extra=log_extra(transaction_id),
+                    "notification processing failed. "
+                    "topic=%s partition=%s offset=%s",
+                    message.topic(),
+                    message.partition(),
+                    message.offset(),
+                    extra=context,
                 )
 
-                # Prevent continuous high-speed retry.
+                # Since the offset is not committed, Kafka can
+                # deliver the message again.
                 time.sleep(5)
 
     finally:
+
         LOGGER.info(
-            "Closing Kafka consumer",
-            extra=log_extra("N/A"),
+            "Closing Kafka consumer.",
+            extra=log_extra(),
         )
 
         consumer.close()
+
+        LOGGER.info(
+            "Kafka consumer closed.",
+            extra=log_extra(),
+        )
 
 
 if __name__ == "__main__":
@@ -542,9 +939,10 @@ if __name__ == "__main__":
         main()
 
     except Exception:
+
         LOGGER.exception(
-            "Notification worker stopped unexpectedly",
-            extra=log_extra("N/A"),
+            "Notification worker stopped unexpectedly.",
+            extra=log_extra(),
         )
 
         sys.exit(1)

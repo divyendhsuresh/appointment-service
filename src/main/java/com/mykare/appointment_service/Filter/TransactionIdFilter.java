@@ -1,78 +1,97 @@
 package com.mykare.appointment_service.Filter;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.mykare.appointment_service.Common.Constants.HeaderConstants;
 import com.mykare.appointment_service.Common.Response.ApiResponse;
-import com.mykare.appointment_service.DTO.Response.ErrorResponseData;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.slf4j.MDC;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.UUID;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class TransactionIdFilter extends OncePerRequestFilter {
 
+    public static final String TRANSACTION_ID_HEADER = "X-Transaction-Id";
+    public static final String MDC_TRANSACTION_ID_KEY = "transactionId";
+
     private final ObjectMapper objectMapper;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
+    protected void doFilterInternal(
+            HttpServletRequest request,
+            HttpServletResponse response,
+            FilterChain filterChain
+    ) throws ServletException, IOException {
 
-        String transactionId = request.getHeader(HeaderConstants.TRANSACTION_ID);
+        String transactionId =
+                request.getHeader(TRANSACTION_ID_HEADER);
 
-        if (transactionId == null || transactionId.isBlank()) {
-
-            ErrorResponseData errorData =
-                    new ErrorResponseData(
-                            "X-Transaction-Id header is required",
-                            null
-                    );
-
-            ApiResponse<ErrorResponseData> apiResponse =
-                    ApiResponse.of(
-                            HttpStatus.BAD_REQUEST.value(),
-                            "Missing transaction ID",
-                            errorData
-                    );
-
-            response.setStatus(HttpStatus.BAD_REQUEST.value());
-            response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-
-            objectMapper.writeValue(response.getOutputStream(), apiResponse);
-            return;
+        /*
+         * Option 1:
+         * Generate an ID when the client does not send one.
+         *
+         * This is usually more convenient than rejecting the request.
+         */
+        if (!StringUtils.hasText(transactionId)) {
+            transactionId = UUID.randomUUID().toString();
         }
 
         try {
-            MDC.put(HeaderConstants.MDC_TRANSACTION_ID, transactionId);
+            MDC.put(MDC_TRANSACTION_ID_KEY, transactionId);
 
-            response.setHeader(HeaderConstants.TRANSACTION_ID, transactionId);
+            response.setHeader(
+                    TRANSACTION_ID_HEADER,
+                    transactionId
+            );
+
+            log.info(
+                    "Incoming request. method={}, path={}, remoteAddress={}",
+                    request.getMethod(),
+                    request.getRequestURI(),
+                    request.getRemoteAddr()
+            );
+
+            long startTime = System.currentTimeMillis();
 
             filterChain.doFilter(request, response);
 
-        } finally {
-            MDC.remove(HeaderConstants.MDC_TRANSACTION_ID);
-        }
-    }
+            long duration = System.currentTimeMillis() - startTime;
 
-    @Override
-    protected boolean shouldNotFilter(HttpServletRequest request) {
-        String path = request.getRequestURI();
-        boolean corsPreflight =
-                "OPTIONS".equalsIgnoreCase(
-                        request.getMethod()
-                );
-        boolean swaggerRequest =
-                path.startsWith("/swagger-ui")
-                        || path.startsWith("/v3/api-docs")
-                        || path.equals("/swagger-ui.html");
-        return corsPreflight || swaggerRequest;
+            log.info(
+                    "Request completed. method={}, path={}, status={}, durationMs={}",
+                    request.getMethod(),
+                    request.getRequestURI(),
+                    response.getStatus(),
+                    duration
+            );
+
+        } catch (Exception exception) {
+
+            log.error(
+                    "Request processing failed. method={}, path={}",
+                    request.getMethod(),
+                    request.getRequestURI(),
+                    exception
+            );
+
+            throw exception;
+
+        } finally {
+            /*
+             * Important because servlet threads are reused.
+             */
+            MDC.remove(MDC_TRANSACTION_ID_KEY);
+        }
     }
 }

@@ -10,6 +10,7 @@ COPY src ./src
 
 RUN mvn clean package -DskipTests
 
+ENV LOG_PATH=/app/logs
 
 FROM eclipse-temurin:21-jre-alpine
 
@@ -25,5 +26,7 @@ RUN chown appointmentuser:appointmentgroup app.jar
 USER appointmentuser
 
 EXPOSE 8080
+
+ENV LOG_PATH=/app/logs
 
 ENTRYPOINT ["java", "-jar", "app.jar"]
